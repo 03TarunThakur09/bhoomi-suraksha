@@ -1,0 +1,211 @@
+================================================================
+  DOCKER ANALYSIS & INTERVIEW GUIDE — Bhoomi Suraksha Project
+================================================================
+
+
+1. CHECK RUNNING CONTAINERS
+----------------------------
+$ docker ps
+$ docker ps -a
+
+Interview Q: "Difference between docker ps and docker ps -a?"
+→ docker ps     = Only running containers
+→ docker ps -a  = All containers (including stopped/exited)
+
+
+2. CHECK DOCKER IMAGES
+-----------------------
+$ docker images
+
+Notice the SIZE column — multi-stage builds make images smaller.
+
+Interview Q: "Why use multi-stage builds?"
+→ Stage 1 installs build tools (gcc, npm)
+→ Stage 2 copies only the compiled output
+→ Final image is small, no build tools = more secure, less attack surface
+
+
+3. CHECK IMAGE LAYERS
+----------------------
+$ docker history bhoomi-backend
+
+Interview Q: "What are Docker layers?"
+→ Each Dockerfile instruction (FROM, RUN, COPY) creates a layer
+→ Layers are cached — if you change line 10, only lines 10+ rebuild
+→ That's why we COPY pyproject.toml BEFORE COPY app/
+  (dependencies change less often → better cache hits)
+
+
+4. CHECK LOGS
+--------------
+$ docker logs bhoomi-backend
+$ docker logs bhoomi-frontend
+$ docker logs -f bhoomi-backend     # Follow live (Ctrl+C to exit)
+
+
+5. GO INSIDE A RUNNING CONTAINER
+----------------------------------
+$ docker exec -it bhoomi-backend /bin/bash
+
+# Inside the container, try:
+$ whoami          # Should show "appuser" (non-root!)
+$ ls /app         # Your app files
+$ env             # Environment variables
+$ exit            # Come back out
+
+Interview Q: "Why run as non-root user?"
+→ If someone hacks into your container, they only have appuser permissions
+→ Not root → can't install packages, modify system files
+→ Security best practice in production
+
+
+6. CHECK NETWORK
+-----------------
+$ docker network ls
+$ docker network inspect real_state_default
+
+Interview Q: "How do containers communicate?"
+→ Docker Compose creates a shared bridge network
+→ Containers reach each other by SERVICE NAME
+  (e.g., frontend can call http://backend:8080)
+→ Isolated from host network by default
+
+
+7. CHECK VOLUMES
+-----------------
+$ docker volume ls
+$ docker volume inspect real_state_uploads_data
+
+Interview Q: "What happens to data when container dies?"
+→ Without volumes → data is LOST (containers are ephemeral)
+→ With volumes → data PERSISTS on host filesystem
+→ That's why we use uploads_data volume for user uploads
+
+
+8. CHECK RESOURCE USAGE
+-------------------------
+$ docker stats
+
+Shows LIVE CPU, Memory, Network, Disk I/O per container.
+Press Ctrl+C to exit.
+
+
+9. BUILD vs RUN COMMANDS
+--------------------------
+$ docker compose build          # Only builds images
+$ docker compose up             # Builds (if needed) + starts
+$ docker compose up -d          # Same but detached (background)
+$ docker compose up --build     # Force rebuild + start
+$ docker compose down           # Stop + remove containers
+$ docker compose down -v        # Stop + remove containers + volumes
+$ docker compose logs -f        # Follow all service logs
+
+
+10. USEFUL DEBUGGING COMMANDS
+-------------------------------
+$ docker inspect bhoomi-backend                 # Full container details (JSON)
+$ docker inspect --format='{{.State.Health}}' bhoomi-backend   # Health status
+$ docker top bhoomi-backend                     # Processes inside container
+$ docker diff bhoomi-backend                    # Files changed since start
+$ docker port bhoomi-backend                    # Port mappings
+
+
+================================================================
+  TOP 15 DOCKER INTERVIEW QUESTIONS
+================================================================
+
+Q1: Docker vs VM?
+→ Docker shares host OS kernel (lightweight, starts in seconds)
+→ VM has full guest OS (heavy, starts in minutes)
+→ Docker uses less RAM and disk
+
+Q2: What is a Docker image?
+→ Read-only template containing app code + dependencies
+→ Like a "class" in programming
+→ Built from a Dockerfile
+
+Q3: What is a container?
+→ Running instance of an image
+→ Like an "object" created from a class
+→ Has its own filesystem, network, process space
+
+Q4: Dockerfile vs docker-compose?
+→ Dockerfile = how to build ONE image
+→ docker-compose = how to run MULTIPLE services together
+→ Compose uses Dockerfiles internally
+
+Q5: COPY vs ADD?
+→ COPY = simple file copy (recommended)
+→ ADD = can extract tar files + download URLs
+→ Best practice: always use COPY unless you need tar extraction
+
+Q6: CMD vs ENTRYPOINT?
+→ CMD = default command, can be overridden at runtime
+→ ENTRYPOINT = fixed command, runtime args are appended
+→ Often used together: ENTRYPOINT ["python"] CMD ["app.py"]
+
+Q7: What is .dockerignore?
+→ Excludes files from build context
+→ Faster builds (less data sent to Docker daemon)
+→ Prevents secrets from accidentally getting into image
+
+Q8: What is a health check?
+→ Docker pings your app periodically
+→ If it fails N times → container marked "unhealthy"
+→ Orchestrators (Compose/K8s) can auto-restart unhealthy containers
+
+Q9: How to reduce image size?
+→ Multi-stage builds (don't ship build tools)
+→ Use alpine/slim base images
+→ Combine RUN commands (fewer layers)
+→ Use .dockerignore
+→ Clean up package manager cache in same RUN layer
+
+Q10: Docker networking types?
+→ Bridge (default) — isolated network for containers
+→ Host — container uses host's network directly
+→ None — no networking
+→ Overlay — multi-host networking (Docker Swarm)
+
+Q11: What is Docker layer caching?
+→ Each instruction creates a cached layer
+→ If instruction hasn't changed, Docker reuses the cache
+→ Order matters: put rarely-changing instructions first
+→ Example: COPY requirements.txt before COPY . (deps change less)
+
+Q12: How do you persist data in Docker?
+→ Named volumes (docker manages location)
+→ Bind mounts (you specify host path)
+→ tmpfs mounts (in-memory, temporary)
+
+Q13: What is a Docker registry?
+→ Storage for Docker images (like GitHub for code)
+→ Docker Hub = public registry
+→ GCP Artifact Registry, AWS ECR = private registries
+
+Q14: EXPOSE instruction — does it publish ports?
+→ NO! EXPOSE is documentation only
+→ Actual port publishing: docker run -p 8080:8080
+→ In Compose: ports: ["8080:8080"]
+
+Q15: How to pass secrets to containers?
+→ Environment variables (docker run -e or compose env)
+→ Docker secrets (Swarm mode)
+→ Mount secret files as volumes
+→ NEVER bake secrets into images (use .dockerignore)
+
+
+================================================================
+  DOCKERFILE BEST PRACTICES CHECKLIST
+================================================================
+
+[✓] Use specific base image tags (python:3.11-slim, not python:latest)
+[✓] Use multi-stage builds
+[✓] Order instructions by change frequency (least → most)
+[✓] Combine RUN commands to reduce layers
+[✓] Use .dockerignore
+[✓] Run as non-root user
+[✓] Add HEALTHCHECK
+[✓] Set WORKDIR (don't use cd)
+[✓] Use COPY, not ADD
+[✓] Don't store secrets in image

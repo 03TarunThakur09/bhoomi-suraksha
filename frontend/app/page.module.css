@@ -1,0 +1,266 @@
+/* ── Landing Page Styles — Bhoomi Suraksha ────────── */
+
+/* Local keyframes — must be defined here because CSS Modules
+   scopes animation names, so globals.css @keyframes are invisible. */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.landing {
+  overflow-x: hidden;
+}
+
+/* Hero */
+.hero {
+  position: relative;
+  min-height: 90vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 0;
+}
+
+.heroBg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 60%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.heroContent {
+  position: relative;
+  z-index: 1;
+  max-width: 800px;
+}
+
+.heroTag {
+  display: inline-block;
+  padding: 8px 20px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  margin-bottom: 24px;
+  animation: fadeIn 0.6s ease;
+}
+
+.heroTitle {
+  font-family: var(--font-heading);
+  font-size: clamp(36px, 5vw, 64px);
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 20px;
+  animation: slideUp 0.7s ease;
+}
+
+.heroSubtitle {
+  font-size: 18px;
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto 32px;
+  line-height: 1.7;
+  animation: slideUp 0.8s ease;
+}
+
+.heroCta {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  animation: slideUp 0.9s ease;
+}
+
+.heroStats {
+  display: flex;
+  gap: 32px;
+  justify-content: center;
+  margin-top: 60px;
+  flex-wrap: wrap;
+  animation: fadeIn 1.2s ease;
+}
+
+.stat {
+  text-align: center;
+}
+
+.statValue {
+  font-size: 32px;
+  margin-bottom: 4px;
+}
+
+.statLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ── Why Section ─────────────────────────────────── */
+
+.whySection {
+  padding: 80px 0;
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.whyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.whyCard {
+  padding: 32px;
+  text-align: center;
+}
+
+.whyIcon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.whyCard h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.whyCard p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+/* Sections */
+.sectionTitle {
+  font-family: var(--font-heading);
+  font-size: 36px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.howSection,
+.docSection {
+  padding: 80px 0;
+}
+
+.docSection {
+  background: rgba(255, 255, 255, 0.01);
+}
+
+/* Steps */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+}
+
+.stepCard {
+  text-align: center;
+  padding: 32px 24px;
+}
+
+.stepIcon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.stepNum {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+}
+
+.stepCard h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.stepCard p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Doc Grid */
+.docGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.docCard {
+  text-align: center;
+  padding: 24px;
+}
+
+.docName {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.docHindi {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Footer */
+.footer {
+  padding: 40px 0;
+  border-top: 1px solid var(--border-color);
+}
+
+.footerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.footerContent p {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+.footerLinks {
+  display: flex;
+  gap: 24px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* ── Responsive ──────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .whyGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .footerContent {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .footerLinks {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

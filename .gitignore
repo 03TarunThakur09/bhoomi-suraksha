@@ -1,0 +1,53 @@
+# ── Secrets & Credentials ────────────────
+.env
+*.env.*
+!.env.example
+google_cred.json
+gha-key.json
+*credentials*.json
+*.pem
+*.key
+
+# ── Python ───────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# ── Database ─────────────────────────────
+*.db
+*.sqlite3
+
+# ── Uploads (user data) ─────────────────
+uploads/
+
+# ── Node.js / Next.js ───────────────────
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# ── OS / IDE ─────────────────────────────
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+*.iml
+
+# ── Docker ───────────────────────────────
+docker-compose.override.yml
+
+# ── Test output ──────────────────────────
+tests/output/
+
+# ── Misc ─────────────────────────────────
+*.png
+*.log
+bhulekh_*.png
+.claude/
