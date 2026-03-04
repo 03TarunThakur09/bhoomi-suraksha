@@ -38,10 +38,10 @@ jobs:
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
       - name: Build Docker image
+        env:
+          IMAGE: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bhoomi/${{ env.BACKEND_IMAGE }}
         run: |
-          docker build -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bhoomi/${{ env.BACKEND_IMAGE }}:${{ github.sha }} \
-                        -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bhoomi/${{ env.BACKEND_IMAGE }}:latest \
-                        -f Dockerfile .
+          docker build -t "${IMAGE}:${{ github.sha }}" -t "${IMAGE}:latest" -f Dockerfile .
 
       - name: Push to Artifact Registry
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -95,12 +95,11 @@ jobs:
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
       - name: Build Docker image
+        env:
+          IMAGE: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bhoomi/${{ env.FRONTEND_IMAGE }}
+          API_URL: ${{ steps.backend-url.outputs.url || 'http://localhost:8080' }}
         run: |
-          docker build \
-            --build-arg NEXT_PUBLIC_API_URL=${{ steps.backend-url.outputs.url || 'http://localhost:8080' }} \
-            -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bhoomi/${{ env.FRONTEND_IMAGE }}:${{ github.sha }} \
-            -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bhoomi/${{ env.FRONTEND_IMAGE }}:latest \
-            -f frontend/Dockerfile frontend/
+          docker build --build-arg NEXT_PUBLIC_API_URL="${API_URL}" -t "${IMAGE}:${{ github.sha }}" -t "${IMAGE}:latest" -f frontend/Dockerfile frontend/
 
       - name: Push to Artifact Registry
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
