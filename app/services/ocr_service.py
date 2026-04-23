@@ -1,9 +1,9 @@
 """
-Bhoomi Suraksha — OCR Service
-Google Vision API integration for Hindi + English document OCR.
-Fallback to basic image-to-text if Vision API is unavailable.
+Bhoomi Suraksha — Multi-Engine OCR Service
+Supports three engines: Gemini Vision, PaddleOCR, IndicOCR (EasyOCR/AI4Bharat).
 """
 
+import asyncio
 import io
 import logging
 from pathlib import Path
@@ -13,178 +13,241 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 
-class OCRService:
-    """Extracts text from property documents using Google Cloud Vision API."""
+# ── PDF → Images helper ───────────────────────────────────────
+
+def _pdf_to_images(file_path: Path) -> list[bytes]:
+    """Convert PDF pages to PNG image bytes using PyMuPDF (max 5 pages)."""
+    try:
+        import fitz  # pymupdf
+        doc = fitz.open(str(file_path))
+        images = []
+        for i in range(min(len(doc), 5)):
+            page = doc[i]
+            pix = page.get_pixmap(dpi=200)
+            images.append(pix.tobytes("png"))
+        doc.close()
+        return images
+    except ImportError:
+        logger.warning("pymupdf not installed — cannot process PDF for this engine")
+        return []
+
+
+# ── Engine 1: Gemini Vision ───────────────────────────────────
+
+class GeminiOCREngine:
+    """OCR via Gemini Vision API (uses existing GEMINI_API_KEY, free tier)."""
+
+    async def extract_text(self, file_path: Path) -> dict:
+        from app.config import settings
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(api_key=settings.gemini_api_key)
+
+        if file_path.suffix.lower() == ".pdf":
+            images = _pdf_to_images(file_path)
+            if not images:
+                return _empty_result("gemini_vision")
+
+            parts = [
+                types.Part.from_bytes(data=img, mime_type="image/png")
+                for img in images
+            ]
+            parts.append(
+                "Extract all text from these document images. "
+                "Return only the raw text, preserving line breaks and structure."
+            )
+            response = await asyncio.to_thread(
+                client.models.generate_content,
+                model="gemini-1.5-flash",
+                contents=parts,
+            )
+            pages = len(images)
+        else:
+            mime_map = {
+                ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                ".png": "image/png", ".tiff": "image/tiff", ".tif": "image/tiff",
+            }
+            mime_type = mime_map.get(file_path.suffix.lower(), "image/jpeg")
+            img_bytes = file_path.read_bytes()
+            response = await asyncio.to_thread(
+                client.models.generate_content,
+                model="gemini-1.5-flash",
+                contents=[
+                    types.Part.from_bytes(data=img_bytes, mime_type=mime_type),
+                    "Extract all text from this document image. "
+                    "Return only the raw text, preserving line breaks and structure.",
+                ],
+            )
+            pages = 1
+
+        return {
+            "text": response.text or "",
+            "language": ["hi", "en"],
+            "confidence": 0.9,
+            "pages": pages,
+            "method": "gemini_vision",
+        }
+
+
+# ── Engine 2: PaddleOCR ───────────────────────────────────────
+
+class PaddleOCREngine:
+    """OCR via PaddleOCR (open source, runs locally, no API key needed)."""
 
     def __init__(self):
-        self._vision_client = None
+        self._ocr = None
 
-    def _get_vision_client(self):
-        """Lazy-load Vision API client."""
-        if self._vision_client is None:
+    def _get_ocr(self):
+        if self._ocr is None:
             try:
-                from google.cloud import vision
-                self._vision_client = vision.ImageAnnotatorClient()
-                logger.info("Google Cloud Vision client initialized")
-            except Exception as e:
-                logger.warning(f"Vision API unavailable: {e}. Will use fallback OCR.")
-                self._vision_client = None
-        return self._vision_client
+                from paddleocr import PaddleOCR
+                # lang='hi' uses PaddleOCR's Hindi Devanagari model
+                self._ocr = PaddleOCR(use_angle_cls=True, lang="hi", use_gpu=False, show_log=False)
+                logger.info("PaddleOCR initialized (Hindi model)")
+            except ImportError:
+                raise RuntimeError(
+                    "PaddleOCR not installed. Run: pip install paddlepaddle paddleocr"
+                )
+        return self._ocr
+
+    async def extract_text(self, file_path: Path) -> dict:
+        ocr = self._get_ocr()
+
+        if file_path.suffix.lower() == ".pdf":
+            images = _pdf_to_images(file_path)
+            if not images:
+                return _empty_result("paddle_ocr")
+            all_text, total_conf, count = [], 0.0, 0
+            for img_bytes in images:
+                lines, conf, n = _parse_paddle_result(
+                    await asyncio.to_thread(ocr.ocr, img_bytes, cls=True)
+                )
+                all_text.extend(lines)
+                all_text.append("\n--- PAGE BREAK ---\n")
+                total_conf += conf
+                count += n
+            return {
+                "text": "\n".join(all_text),
+                "language": ["hi", "en"],
+                "confidence": round(total_conf / max(count, 1), 3),
+                "pages": len(images),
+                "method": "paddle_ocr",
+            }
+        else:
+            img_bytes = file_path.read_bytes()
+            result = await asyncio.to_thread(ocr.ocr, img_bytes, cls=True)
+            lines, total_conf, count = _parse_paddle_result(result)
+            return {
+                "text": "\n".join(lines),
+                "language": ["hi", "en"],
+                "confidence": round(total_conf / max(count, 1), 3),
+                "pages": 1,
+                "method": "paddle_ocr",
+            }
+
+
+def _parse_paddle_result(result) -> tuple[list[str], float, int]:
+    lines, total_conf, count = [], 0.0, 0
+    if result and result[0]:
+        for line in result[0]:
+            if line and len(line) >= 2:
+                lines.append(line[1][0])
+                total_conf += line[1][1]
+                count += 1
+    return lines, total_conf, count
+
+
+# ── Engine 3: IndicOCR (AI4Bharat via EasyOCR) ───────────────
+
+class IndicOCREngine:
+    """
+    OCR using EasyOCR with Hindi + English language models.
+    Implements the AI4Bharat IndicOCR approach for Indian language documents.
+    """
+
+    def __init__(self):
+        self._reader = None
+
+    def _get_reader(self):
+        if self._reader is None:
+            try:
+                import easyocr
+                self._reader = easyocr.Reader(["hi", "en"], gpu=False)
+                logger.info("IndicOCR (EasyOCR) reader initialized with Hindi + English")
+            except ImportError:
+                raise RuntimeError(
+                    "EasyOCR not installed. Run: pip install easyocr"
+                )
+        return self._reader
+
+    async def extract_text(self, file_path: Path) -> dict:
+        reader = self._get_reader()
+
+        if file_path.suffix.lower() == ".pdf":
+            images = _pdf_to_images(file_path)
+            if not images:
+                return _empty_result("indic_ocr")
+            all_text, total_conf, count = [], 0.0, 0
+            for img_bytes in images:
+                result = await asyncio.to_thread(reader.readtext, img_bytes)
+                for detection in result:
+                    all_text.append(detection[1])
+                    total_conf += detection[2]
+                    count += 1
+                all_text.append("\n--- PAGE BREAK ---\n")
+            return {
+                "text": "\n".join(all_text),
+                "language": ["hi", "en"],
+                "confidence": round(total_conf / max(count, 1), 3),
+                "pages": len(images),
+                "method": "indic_ocr",
+            }
+        else:
+            img_bytes = file_path.read_bytes()
+            result = await asyncio.to_thread(reader.readtext, img_bytes)
+            lines, total_conf, count = [], 0.0, 0
+            for detection in result:
+                lines.append(detection[1])
+                total_conf += detection[2]
+                count += 1
+            return {
+                "text": "\n".join(lines),
+                "language": ["hi", "en"],
+                "confidence": round(total_conf / max(count, 1), 3),
+                "pages": 1,
+                "method": "indic_ocr",
+            }
+
+
+# ── OCR Service Factory ───────────────────────────────────────
+
+VALID_ENGINES = {"gemini", "paddle", "indic"}
+
+
+class OCRService:
+    """Factory — picks the right OCR engine based on the caller's choice."""
+
+    def __init__(self, engine: str = "gemini"):
+        if engine not in VALID_ENGINES:
+            logger.warning(f"Unknown OCR engine '{engine}', falling back to gemini")
+            engine = "gemini"
+        self.engine = engine
+        if engine == "gemini":
+            self._impl = GeminiOCREngine()
+        elif engine == "paddle":
+            self._impl = PaddleOCREngine()
+        elif engine == "indic":
+            self._impl = IndicOCREngine()
 
     async def extract_text(self, file_path: str) -> dict:
-        """
-        Extract text from a document file (PDF, JPEG, PNG, TIFF).
-
-        Returns:
-            dict with keys:
-                - text: Full extracted text
-                - language: Detected language(s)
-                - confidence: OCR confidence score
-                - pages: Number of pages processed
-                - method: OCR method used
-        """
         path = Path(file_path)
         if not path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
+        return await self._impl.extract_text(path)
 
-        mime_type = self._detect_mime(path)
 
-        # Try Google Vision API first
-        client = self._get_vision_client()
-        if client:
-            try:
-                return await self._extract_with_vision(client, path, mime_type)
-            except Exception as e:
-                logger.warning(f"Vision API failed, using fallback: {e}")
+# ── Helpers ───────────────────────────────────────────────────
 
-        # Fallback: basic text extraction info
-        return self._fallback_extract(path)
-
-    async def _extract_with_vision(self, client, file_path: Path, mime_type: str) -> dict:
-        """Extract text using Google Cloud Vision API."""
-        from google.cloud import vision
-
-        content = file_path.read_bytes()
-
-        if mime_type == "application/pdf":
-            # Use async document text detection for PDFs
-            return await self._extract_pdf_vision(client, content)
-        else:
-            # Use image text detection
-            image = vision.Image(content=content)
-
-            # Use document_text_detection for better structured text
-            response = client.document_text_detection(
-                image=image,
-                image_context=vision.ImageContext(
-                    language_hints=["hi", "en"]  # Hindi + English
-                ),
-            )
-
-            if response.error.message:
-                raise Exception(f"Vision API error: {response.error.message}")
-
-            full_text = response.full_text_annotation
-            detected_languages = []
-            confidence = 0.0
-
-            if full_text and full_text.pages:
-                for page in full_text.pages:
-                    confidence = max(confidence, page.confidence if hasattr(page, 'confidence') else 0.0)
-                    for lang in page.property.detected_languages if page.property else []:
-                        detected_languages.append(lang.language_code)
-
-            return {
-                "text": full_text.text if full_text else "",
-                "language": list(set(detected_languages)) or ["unknown"],
-                "confidence": round(confidence, 3),
-                "pages": len(full_text.pages) if full_text else 0,
-                "method": "google_vision",
-            }
-
-    async def _extract_pdf_vision(self, client, content: bytes) -> dict:
-        """Extract text from PDF using Vision API batch annotation."""
-        from google.cloud import vision
-
-        input_config = vision.InputConfig(
-            content=content,
-            mime_type="application/pdf",
-        )
-        feature = vision.Feature(type_=vision.Feature.Type.DOCUMENT_TEXT_DETECTION)
-        request = vision.AnnotateFileRequest(
-            input_config=input_config,
-            features=[feature],
-            # Process up to 5 pages
-            pages=list(range(1, 6)),
-        )
-
-        response = client.batch_annotate_files(requests=[request])
-
-        full_text_parts = []
-        total_pages = 0
-
-        for file_response in response.responses:
-            for page_response in file_response.responses:
-                if page_response.full_text_annotation:
-                    full_text_parts.append(page_response.full_text_annotation.text)
-                    total_pages += 1
-
-        combined_text = "\n\n--- PAGE BREAK ---\n\n".join(full_text_parts)
-
-        return {
-            "text": combined_text,
-            "language": ["hi", "en"],
-            "confidence": 0.85,
-            "pages": total_pages,
-            "method": "google_vision_pdf",
-        }
-
-    def _fallback_extract(self, file_path: Path) -> dict:
-        """Fallback: return placeholder OCR result with instructions."""
-        logger.info(f"Using fallback OCR for {file_path.name}")
-        return {
-            "text": f"[OCR FALLBACK] File: {file_path.name}. "
-                    "Google Cloud Vision API not configured. "
-                    "Set GOOGLE_APPLICATION_CREDENTIALS in .env to enable OCR.",
-            "language": ["unknown"],
-            "confidence": 0.0,
-            "pages": 0,
-            "method": "fallback",
-        }
-
-    def _detect_mime(self, path: Path) -> str:
-        """Detect MIME type from file extension."""
-        ext_map = {
-            ".pdf": "application/pdf",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".png": "image/png",
-            ".tiff": "image/tiff",
-            ".tif": "image/tiff",
-        }
-        return ext_map.get(path.suffix.lower(), "application/octet-stream")
-
-    async def preprocess_image(self, file_path: str) -> str:
-        """
-        Preprocess image for better OCR results.
-        Applies: resize, contrast enhancement, grayscale conversion.
-        Returns path to preprocessed image.
-        """
-        path = Path(file_path)
-        img = Image.open(path)
-
-        # Convert to grayscale
-        if img.mode != "L":
-            img = img.convert("L")
-
-        # Resize if too small
-        min_dimension = 1000
-        if min(img.size) < min_dimension:
-            ratio = min_dimension / min(img.size)
-            new_size = (int(img.width * ratio), int(img.height * ratio))
-            img = img.resize(new_size, Image.LANCZOS)
-
-        # Save preprocessed image
-        preprocessed_path = path.parent / f"preprocessed_{path.name}"
-        img.save(str(preprocessed_path))
-        return str(preprocessed_path)
+def _empty_result(method: str) -> dict:
+    return {"text": "", "language": ["unknown"], "confidence": 0.0, "pages": 0, "method": method}

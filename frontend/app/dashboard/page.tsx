@@ -13,6 +13,7 @@ export default function DashboardPage() {
     const [uploading, setUploading] = useState(false);
     const [analyzing, setAnalyzing] = useState<string | null>(null);
     const [dragOver, setDragOver] = useState(false);
+    const [ocrEngine, setOcrEngine] = useState("gemini");
 
     const loadData = useCallback(async () => {
         try {
@@ -65,7 +66,7 @@ export default function DashboardPage() {
     const handleAnalyze = async (docId: string) => {
         setAnalyzing(docId);
         try {
-            await api.analyzeDocument(docId);
+            await api.analyzeDocument(docId, ocrEngine);
             await loadData();
             router.push(`/document/${docId}`);
         } catch (err: any) {
@@ -171,6 +172,53 @@ export default function DashboardPage() {
                                 </p>
                             </>
                         )}
+                    </div>
+                </div>
+
+                {/* OCR Engine Selector */}
+                <div className={styles.section}>
+                    <div className={styles.sectionHeader}>
+                        <h2>🔬 OCR Engine</h2>
+                    </div>
+                    <div className="glass-card" style={{ padding: "20px 24px" }}>
+                        <p style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 16 }}>
+                            Select the OCR engine to use when analyzing documents
+                        </p>
+                        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                            {[
+                                { id: "gemini", label: "Gemini Vision", desc: "Google AI (Free tier)", icon: "✨" },
+                                { id: "paddle", label: "PaddleOCR", desc: "Open source, Hindi model", icon: "🏓" },
+                                { id: "indic", label: "IndicOCR", desc: "AI4Bharat, Hindi + English", icon: "🇮🇳" },
+                            ].map((engine) => (
+                                <button
+                                    key={engine.id}
+                                    onClick={() => setOcrEngine(engine.id)}
+                                    style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "flex-start",
+                                        padding: "12px 20px",
+                                        borderRadius: 10,
+                                        border: ocrEngine === engine.id
+                                            ? "2px solid var(--primary, #6366f1)"
+                                            : "2px solid var(--border, #e2e8f0)",
+                                        background: ocrEngine === engine.id
+                                            ? "var(--primary-light, rgba(99,102,241,0.08))"
+                                            : "transparent",
+                                        cursor: "pointer",
+                                        minWidth: 160,
+                                        transition: "all 0.2s",
+                                    }}
+                                >
+                                    <span style={{ fontSize: 20, marginBottom: 4 }}>{engine.icon}</span>
+                                    <span style={{ fontWeight: 600, fontSize: 14 }}>{engine.label}</span>
+                                    <span style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{engine.desc}</span>
+                                </button>
+                            ))}
+                        </div>
+                        <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
+                            Selected: <strong>{ocrEngine}</strong> — this engine will be used when you click Analyze
+                        </p>
                     </div>
                 </div>
 

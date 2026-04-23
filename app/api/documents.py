@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from typing import Literal
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -152,6 +153,7 @@ async def delete_document(
 @router.post("/{document_id}/analyze", response_model=AnalyzeResponse)
 async def analyze_document(
     document_id: str,
+    ocr_engine: str = Query(default="gemini", description="OCR engine to use: gemini, paddle, indic"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -175,9 +177,9 @@ async def analyze_document(
     await db.flush()
 
     try:
-        # Step 1: Run OCR
+        # Step 1: Run OCR with selected engine
         from app.services.ocr_service import OCRService
-        ocr_service = OCRService()
+        ocr_service = OCRService(engine=ocr_engine)
         ocr_result = await ocr_service.extract_text(document.file_path)
         # OCR service returns a dict with "text" key — extract the string
         ocr_text = ocr_result["text"] if isinstance(ocr_result, dict) else str(ocr_result)

@@ -120,12 +120,12 @@ class ApiClient {
         });
     }
 
-    // Analyze — runs OCR + entity extraction
-    async analyzeDocument(documentId: string) {
-        return this.request<AnalyzeResponse>(`/api/documents/${documentId}/analyze`, {
-            method: "POST",
-            headers: this.headers(),
-        });
+    // Analyze — runs OCR + entity extraction with selected engine
+    async analyzeDocument(documentId: string, ocrEngine: string = "gemini") {
+        return this.request<AnalyzeResponse>(
+            `/api/documents/${documentId}/analyze?ocr_engine=${encodeURIComponent(ocrEngine)}`,
+            { method: "POST", headers: this.headers() }
+        );
     }
 
     // Get saved entities
