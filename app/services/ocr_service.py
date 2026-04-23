@@ -107,7 +107,7 @@ class GeminiOCREngine:
 # ── Engine 2: PaddleOCR ───────────────────────────────────────
 
 class PaddleOCREngine:
-    """OCR via PaddleOCR (open source, runs locally, no API key needed)."""
+    """OCR via PaddleOCR 3.x (open source, runs locally, no API key needed)."""
 
     def __init__(self):
         self._ocr = None
@@ -116,30 +116,29 @@ class PaddleOCREngine:
         if self._ocr is None:
             try:
                 from paddleocr import PaddleOCR
-                # show_log removed in PaddleOCR 3.x
-                self._ocr = PaddleOCR(use_angle_cls=True, lang="hi", use_gpu=False)
-                logger.info("PaddleOCR initialized (Hindi model)")
+                self._ocr = PaddleOCR(lang="hi")
+                logger.info("PaddleOCR initialized (Hindi model, v3.x)")
             except ImportError:
                 raise RuntimeError("PaddleOCR not installed. Run: pip install paddlepaddle paddleocr")
-            except TypeError as e:
-                # Handle any other unknown argument errors gracefully
-                logger.warning(f"PaddleOCR init with reduced args due to: {e}")
-                from paddleocr import PaddleOCR
-                self._ocr = PaddleOCR(lang="hi")
-                logger.info("PaddleOCR initialized (minimal args)")
         return self._ocr
 
     async def extract_text(self, file_path: Path) -> dict:
         ocr = self._get_ocr()
+
         if file_path.suffix.lower() == ".pdf":
             images = _pdf_to_images(file_path)
             if not images:
                 return _empty_result("paddle_ocr")
             all_text, total_conf, count = [], 0.0, 0
             for img_bytes in images:
-                lines, conf, n = _parse_paddle_result(
-                    await asyncio.to_thread(ocr.ocr, img_bytes, cls=True)
-                )
+                # Save bytes to temp file — PaddleOCR 3.x works best with file paths
+                import tempfile
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                    tmp.write(img_bytes)
+                    tmp_path = tmp.name
+                result = await asyncio.to_thread(ocr.ocr, tmp_path)
+                Path(tmp_path).unlink(missing_ok=True)
+                lines, conf, n = _parse_paddle_result_v3(result)
                 all_text.extend(lines)
                 all_text.append("\n--- PAGE BREAK ---\n")
                 total_conf += conf
@@ -152,9 +151,8 @@ class PaddleOCREngine:
                 "method": "paddle_ocr",
             }
         else:
-            img_bytes = file_path.read_bytes()
-            result = await asyncio.to_thread(ocr.ocr, img_bytes, cls=True)
-            lines, total_conf, count = _parse_paddle_result(result)
+            result = await asyncio.to_thread(ocr.ocr, str(file_path))
+            lines, total_conf, count = _parse_paddle_result_v3(result)
             return {
                 "text": "\n".join(lines),
                 "language": ["hi", "en"],
@@ -164,13 +162,18 @@ class PaddleOCREngine:
             }
 
 
-def _parse_paddle_result(result) -> tuple[list[str], float, int]:
+def _parse_paddle_result_v3(result) -> tuple[list[str], float, int]:
+    """Parse PaddleOCR 3.x output format (list of dicts with rec_texts/rec_scores)."""
     lines, total_conf, count = [], 0.0, 0
-    if result and result[0]:
-        for line in result[0]:
-            if line and len(line) >= 2:
-                lines.append(line[1][0])
-                total_conf += line[1][1]
+    if not result:
+        return lines, total_conf, count
+    for page in result:
+        texts = page.get("rec_texts", [])
+        scores = page.get("rec_scores", [])
+        for text, score in zip(texts, scores):
+            if text.strip():
+                lines.append(text)
+                total_conf += score
                 count += 1
     return lines, total_conf, count
 
