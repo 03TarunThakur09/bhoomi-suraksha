@@ -26,6 +26,10 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# Pre-download OCR models at build time so first request is instant
+RUN python -c "import easyocr; easyocr.Reader(['hi', 'en'], gpu=False)" && \
+    python -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=True, lang='hi', use_gpu=False, show_log=False)"
+
 # ── Stage 2: Runtime ─────────────────────────────────────────
 FROM python:3.11-slim AS runtime
 
@@ -45,6 +49,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy installed Python packages from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy pre-downloaded OCR model files
+COPY --from=builder /root/.EasyOCR /root/.EasyOCR
+COPY --from=builder /root/.paddleocr /root/.paddleocr
 
 # Copy application code
 COPY app/ ./app/
