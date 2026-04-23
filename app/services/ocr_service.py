@@ -1,16 +1,18 @@
 """
 Bhoomi Suraksha — Multi-Engine OCR Service
 Supports three engines: Gemini Vision, PaddleOCR, IndicOCR (EasyOCR/AI4Bharat).
+
+Engines are singletons — models load once at startup warmup and are reused.
 """
 
 import asyncio
-import io
 import logging
 from pathlib import Path
 
-from PIL import Image
-
 logger = logging.getLogger(__name__)
+
+# Model storage inside /app so appuser has write permissions
+_MODEL_DIR = Path("/app/models")
 
 
 # ── PDF → Images helper ───────────────────────────────────────
@@ -18,7 +20,7 @@ logger = logging.getLogger(__name__)
 def _pdf_to_images(file_path: Path) -> list[bytes]:
     """Convert PDF pages to PNG image bytes using PyMuPDF (max 5 pages)."""
     try:
-        import fitz  # pymupdf
+        import fitz
         doc = fitz.open(str(file_path))
         images = []
         for i in range(min(len(doc), 5)):
@@ -44,7 +46,6 @@ class GeminiOCREngine:
 
         client = genai.Client(api_key=settings.gemini_api_key)
 
-        # Retry up to 3 times on rate limit (429)
         for attempt in range(3):
             try:
                 return await self._call_gemini(client, types, file_path)
@@ -52,13 +53,12 @@ class GeminiOCREngine:
                 if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
                     if attempt < 2:
                         wait = (attempt + 1) * 15
-                        logger.warning(f"Gemini rate limit hit, retrying in {wait}s...")
+                        logger.warning(f"Gemini rate limit, retrying in {wait}s...")
                         await asyncio.sleep(wait)
                     else:
                         raise RuntimeError(
-                            "Gemini API quota exhausted for today. "
-                            "Please try PaddleOCR or IndicOCR engine instead, "
-                            "or try again tomorrow."
+                            "Gemini API quota exhausted. "
+                            "Please select PaddleOCR or IndicOCR engine instead."
                         )
                 else:
                     raise
@@ -68,19 +68,13 @@ class GeminiOCREngine:
             images = _pdf_to_images(file_path)
             if not images:
                 return _empty_result("gemini_vision")
-
-            parts = [
-                types.Part.from_bytes(data=img, mime_type="image/png")
-                for img in images
-            ]
+            parts = [types.Part.from_bytes(data=img, mime_type="image/png") for img in images]
             parts.append(
                 "Extract all text from these document images. "
                 "Return only the raw text, preserving line breaks and structure."
             )
             response = await asyncio.to_thread(
-                client.models.generate_content,
-                model="gemini-2.0-flash",
-                contents=parts,
+                client.models.generate_content, model="gemini-2.0-flash", contents=parts
             )
             pages = len(images)
         else:
@@ -122,18 +116,21 @@ class PaddleOCREngine:
         if self._ocr is None:
             try:
                 from paddleocr import PaddleOCR
-                # lang='hi' uses PaddleOCR's Hindi Devanagari model
-                self._ocr = PaddleOCR(use_angle_cls=True, lang="hi", use_gpu=False, show_log=False)
+                # show_log removed in PaddleOCR 3.x
+                self._ocr = PaddleOCR(use_angle_cls=True, lang="hi", use_gpu=False)
                 logger.info("PaddleOCR initialized (Hindi model)")
             except ImportError:
-                raise RuntimeError(
-                    "PaddleOCR not installed. Run: pip install paddlepaddle paddleocr"
-                )
+                raise RuntimeError("PaddleOCR not installed. Run: pip install paddlepaddle paddleocr")
+            except TypeError as e:
+                # Handle any other unknown argument errors gracefully
+                logger.warning(f"PaddleOCR init with reduced args due to: {e}")
+                from paddleocr import PaddleOCR
+                self._ocr = PaddleOCR(lang="hi")
+                logger.info("PaddleOCR initialized (minimal args)")
         return self._ocr
 
     async def extract_text(self, file_path: Path) -> dict:
         ocr = self._get_ocr()
-
         if file_path.suffix.lower() == ".pdf":
             images = _pdf_to_images(file_path)
             if not images:
@@ -193,17 +190,20 @@ class IndicOCREngine:
         if self._reader is None:
             try:
                 import easyocr
-                self._reader = easyocr.Reader(["hi", "en"], gpu=False)
-                logger.info("IndicOCR (EasyOCR) reader initialized with Hindi + English")
-            except ImportError:
-                raise RuntimeError(
-                    "EasyOCR not installed. Run: pip install easyocr"
+                model_dir = str(_MODEL_DIR / "easyocr")
+                Path(model_dir).mkdir(parents=True, exist_ok=True)
+                self._reader = easyocr.Reader(
+                    ["hi", "en"],
+                    gpu=False,
+                    model_storage_directory=model_dir,
                 )
+                logger.info("IndicOCR (EasyOCR) initialized with Hindi + English")
+            except ImportError:
+                raise RuntimeError("EasyOCR not installed. Run: pip install easyocr")
         return self._reader
 
     async def extract_text(self, file_path: Path) -> dict:
         reader = self._get_reader()
-
         if file_path.suffix.lower() == ".pdf":
             images = _pdf_to_images(file_path)
             if not images:
@@ -240,25 +240,46 @@ class IndicOCREngine:
             }
 
 
+# ── Singletons — shared across all requests ───────────────────
+# Models load once (during startup warmup) and are reused forever.
+
+_PADDLE_ENGINE: PaddleOCREngine | None = None
+_INDIC_ENGINE: IndicOCREngine | None = None
+
+
+def get_paddle_engine() -> PaddleOCREngine:
+    global _PADDLE_ENGINE
+    if _PADDLE_ENGINE is None:
+        _PADDLE_ENGINE = PaddleOCREngine()
+    return _PADDLE_ENGINE
+
+
+def get_indic_engine() -> IndicOCREngine:
+    global _INDIC_ENGINE
+    if _INDIC_ENGINE is None:
+        _INDIC_ENGINE = IndicOCREngine()
+    return _INDIC_ENGINE
+
+
 # ── OCR Service Factory ───────────────────────────────────────
 
 VALID_ENGINES = {"gemini", "paddle", "indic"}
 
 
 class OCRService:
-    """Factory — picks the right OCR engine based on the caller's choice."""
+    """Routes OCR to the correct singleton engine."""
 
     def __init__(self, engine: str = "gemini"):
         if engine not in VALID_ENGINES:
-            logger.warning(f"Unknown OCR engine '{engine}', falling back to gemini")
+            logger.warning(f"Unknown engine '{engine}', falling back to gemini")
             engine = "gemini"
         self.engine = engine
         if engine == "gemini":
             self._impl = GeminiOCREngine()
         elif engine == "paddle":
-            self._impl = PaddleOCREngine()
+            self._impl = get_paddle_engine()
         elif engine == "indic":
-            self._impl = IndicOCREngine()
+            self._impl = get_indic_engine()
 
     async def extract_text(self, file_path: str) -> dict:
         path = Path(file_path)

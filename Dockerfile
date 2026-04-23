@@ -50,8 +50,8 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY app/ ./app/
 COPY main.py ./
 
-# Create uploads directory
-RUN mkdir -p /app/uploads
+# Create uploads and models directories
+RUN mkdir -p /app/uploads /app/models/easyocr /app/models/paddle
 
 # Non-root user for security
 RUN useradd --create-home appuser && chown -R appuser:appuser /app
