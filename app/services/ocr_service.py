@@ -59,7 +59,7 @@ class GeminiOCREngine:
             )
             response = await asyncio.to_thread(
                 client.models.generate_content,
-                model="gemini-1.5-flash",
+                model="gemini-2.0-flash",
                 contents=parts,
             )
             pages = len(images)
@@ -72,7 +72,7 @@ class GeminiOCREngine:
             img_bytes = file_path.read_bytes()
             response = await asyncio.to_thread(
                 client.models.generate_content,
-                model="gemini-1.5-flash",
+                model="gemini-2.0-flash",
                 contents=[
                     types.Part.from_bytes(data=img_bytes, mime_type=mime_type),
                     "Extract all text from this document image. "
