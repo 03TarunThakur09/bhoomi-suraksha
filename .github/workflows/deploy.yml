@@ -65,7 +65,8 @@ jobs:
             --set-env-vars "APP_DEBUG=false" \
             --min-instances 0 \
             --max-instances 3 \
-            --memory 512Mi
+            --memory 2Gi \
+            --timeout 300
 
   # ── Job 2: Build & Push Frontend ────────────────────────────
   build-frontend:

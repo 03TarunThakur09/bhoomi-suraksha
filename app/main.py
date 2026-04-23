@@ -4,6 +4,7 @@ Main application entry point with CORS, routing, and lifecycle events.
 AI-powered property document analysis with entity extraction and narration.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -21,6 +22,27 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+
+async def _warmup_ocr_models():
+    """Download and cache OCR models in background at startup."""
+    try:
+        logger.info("Warming up PaddleOCR model (background)...")
+        from app.services.ocr_service import PaddleOCREngine
+        engine = PaddleOCREngine()
+        await asyncio.to_thread(engine._get_ocr)
+        logger.info("PaddleOCR model ready")
+    except Exception as e:
+        logger.warning(f"PaddleOCR warmup failed (non-fatal): {e}")
+
+    try:
+        logger.info("Warming up IndicOCR model (background)...")
+        from app.services.ocr_service import IndicOCREngine
+        engine = IndicOCREngine()
+        await asyncio.to_thread(engine._get_reader)
+        logger.info("IndicOCR model ready")
+    except Exception as e:
+        logger.warning(f"IndicOCR warmup failed (non-fatal): {e}")
 
 
 @asynccontextmanager
@@ -42,6 +64,9 @@ async def lifespan(app: FastAPI):
 
     logger.info("Bhoomi Suraksha is ready!")
     logger.info("=" * 60)
+
+    # Warmup OCR models in background — doesn't block startup
+    asyncio.create_task(_warmup_ocr_models())
 
     yield
 
