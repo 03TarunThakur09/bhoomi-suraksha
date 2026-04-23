@@ -44,6 +44,26 @@ class GeminiOCREngine:
 
         client = genai.Client(api_key=settings.gemini_api_key)
 
+        # Retry up to 3 times on rate limit (429)
+        for attempt in range(3):
+            try:
+                return await self._call_gemini(client, types, file_path)
+            except Exception as e:
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    if attempt < 2:
+                        wait = (attempt + 1) * 15
+                        logger.warning(f"Gemini rate limit hit, retrying in {wait}s...")
+                        await asyncio.sleep(wait)
+                    else:
+                        raise RuntimeError(
+                            "Gemini API quota exhausted for today. "
+                            "Please try PaddleOCR or IndicOCR engine instead, "
+                            "or try again tomorrow."
+                        )
+                else:
+                    raise
+
+    async def _call_gemini(self, client, types, file_path: Path) -> dict:
         if file_path.suffix.lower() == ".pdf":
             images = _pdf_to_images(file_path)
             if not images:
