@@ -8,6 +8,17 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
+# System libraries required by PaddleOCR, EasyOCR, and OpenCV
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libgomp1 \
+    libgl1 \
+    libgles2 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy requirements first (for Docker cache)
 COPY requirements.txt ./
 
@@ -19,6 +30,17 @@ RUN pip install --no-cache-dir --upgrade pip && \
 FROM python:3.11-slim AS runtime
 
 WORKDIR /app
+
+# Same system libraries needed at runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libgomp1 \
+    libgl1 \
+    libgles2 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy installed Python packages from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
