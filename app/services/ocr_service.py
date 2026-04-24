@@ -7,12 +7,14 @@ Engines are singletons — models load once at startup warmup and are reused.
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Model storage inside /app so appuser has write permissions
-_MODEL_DIR = Path("/app/models")
+# Use /app/models in Docker (Cloud Run), fall back to ~/.cache/bhoomi locally
+_APP_DIR = Path("/app")
+_MODEL_DIR = _APP_DIR / "models" if _APP_DIR.exists() and os.access(_APP_DIR, os.W_OK) else Path.home() / ".cache" / "bhoomi" / "models"
 
 
 # ── PDF → Images helper ───────────────────────────────────────
