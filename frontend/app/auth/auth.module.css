@@ -1,229 +1,143 @@
-/* ─────────────────────────────────────────────────────────
-   Bhoomi Suraksha — Auth Pages (Login / Register)
-   ───────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════
+   Auth Pages — Paper / Government portal aesthetic
+   ══════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500&display=swap');
-
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: none; }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
-}
+@keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+@keyframes spin   { to { transform: rotate(360deg); } }
 
 /* ── Page wrapper ─────────────────────────────────────── */
-
 .authPage {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   padding: 40px 20px;
-
-  /* design-system variables */
-  --gold: #D4A017;
-  --gold2: #E8BC3A;
-  --goldSoft: rgba(212, 160, 23, 0.28);
-  --forest: #2D6A2D;
-  --forest2: #3E8E3E;
-  --cream: #FBF5E6;
-  --bg1: #0B1410;
-  --bg2: #0F1A10;
-  --txt: #F3ECD8;
-  --txtDim: rgba(243, 236, 216, 0.66);
-  --txtMuted: rgba(243, 236, 216, 0.4);
-  --err: #E0574B;
-
-  font-family: 'DM Sans', system-ui, sans-serif;
-  color: var(--txt);
-
   background:
-    radial-gradient(ellipse at 30% 20%, rgba(45, 106, 45, 0.18) 0%, transparent 55%),
-    radial-gradient(ellipse at 70% 80%, rgba(212, 160, 23, 0.09) 0%, transparent 50%),
-    #0B1410;
+    radial-gradient(900px 600px at 20% 0%, #fdfaf0 0%, transparent 60%),
+    radial-gradient(600px 400px at 90% 100%, #f5eedb 0%, transparent 60%),
+    var(--paper);
+  font-family: var(--font-body);
+  color: var(--ink);
+  position: relative;
+}
+
+/* tricolor top accent */
+.authPage::before {
+  content: ""; position: fixed; top: 0; left: 0; right: 0; height: 6px;
+  background: linear-gradient(to right, var(--saffron) 33.33%, #fff 33.33% 66.66%, var(--green) 66.66%);
+  z-index: 100;
 }
 
 /* ── Card ─────────────────────────────────────────────── */
-
 .authCard {
-  width: 100%;
-  max-width: 440px;
-  background: rgba(15, 26, 16, 0.8);
-  backdrop-filter: blur(24px) saturate(140%);
-  -webkit-backdrop-filter: blur(24px) saturate(140%);
-  border: 1px solid rgba(212, 160, 23, 0.25);
-  border-radius: 20px;
-  padding: 40px 36px 36px;
-  box-shadow: 0 32px 80px -20px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255,255,255,0.04);
-  animation: fadeUp 0.55s ease both;
+  width: 100%; max-width: 440px;
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  padding: 36px 32px 32px;
+  box-shadow: 5px 5px 0 var(--ink), 8px 8px 0 rgba(255,153,51,0.2);
+  animation: fadeUp 0.5s ease both;
 }
 
 /* ── Logo / header ────────────────────────────────────── */
-
-.authLogo {
-  text-align: center;
-  margin-bottom: 32px;
-}
+.authLogo { text-align: center; margin-bottom: 28px; }
 
 .brandMark {
-  width: 52px; height: 52px; border-radius: 12px;
-  background: radial-gradient(120% 120% at 20% 10%, #E8BC3A 0%, #A87B0E 55%, #6A4A08 100%);
-  display: grid; place-items: center; margin: 0 auto 16px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 8px 24px rgba(0,0,0,0.45);
+  width: 52px; height: 52px; border-radius: 10px;
+  background: radial-gradient(120% 120% at 25% 15%, #f0c94a 0%, #a67c10 100%);
+  display: grid; place-items: center; margin: 0 auto 14px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 4px 16px rgba(0,0,0,0.15);
 }
 
 .authLogo h1 {
-  font-family: 'Playfair Display', serif;
-  font-size: 26px; font-weight: 700; letter-spacing: 0.01em;
-  color: var(--cream); margin: 0 0 6px;
+  font-family: var(--font-head); font-size: 26px; font-weight: 700; color: var(--ink); margin: 0 0 4px;
 }
 
 .authLogo .hin {
-  font-family: 'Noto Sans Devanagari', sans-serif;
-  font-size: 13px; color: var(--gold); letter-spacing: 0.06em;
-  margin-bottom: 12px; display: block;
+  font-family: var(--font-deva); font-size: 13px; color: var(--saffron); letter-spacing: 0.04em;
+  margin-bottom: 10px; display: block;
 }
 
-.authLogo p {
-  color: var(--txtDim);
-  font-size: 14px;
-  margin: 0;
+.authLogo p { font-family: var(--font-body); font-size: 13.5px; color: var(--ink-soft); margin: 0; }
+
+/* Tricolor under logo */
+.authLogo::after {
+  content: ""; display: block; height: 4px; width: 80px; margin: 12px auto 0;
+  background: linear-gradient(to right, var(--saffron) 33.33%, #1a2433 33.33% 66.66%, var(--green) 66.66%);
+  border-radius: 2px;
 }
 
 /* ── Form ─────────────────────────────────────────────── */
+.authForm { display: flex; flex-direction: column; gap: 16px; }
 
-.authForm {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.fieldGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
+.fieldGroup { display: flex; flex-direction: column; gap: 6px; }
 
 .fieldGroup label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--txtMuted);
+  font-family: var(--font-arch); font-size: 9.5px; font-weight: 400;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft);
 }
 
 .fieldGroup input {
-  padding: 12px 16px;
-  background: rgba(11, 20, 16, 0.7);
-  border: 1px solid rgba(212, 160, 23, 0.18);
-  border-radius: 10px;
-  color: var(--txt);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 15px;
-  outline: none;
-  transition: border-color .2s, box-shadow .2s;
+  padding: 11px 14px;
+  background: var(--paper-2);
+  border: 1.5px solid var(--pencil-light);
+  border-radius: 7px;
+  color: var(--ink);
+  font-family: var(--font-body); font-size: 14px;
+  outline: none; transition: border-color .2s, box-shadow .2s;
 }
-
-.fieldGroup input::placeholder { color: var(--txtMuted); }
-
+.fieldGroup input::placeholder { color: var(--ink-light); }
 .fieldGroup input:focus {
-  border-color: rgba(212, 160, 23, 0.6);
-  box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.1);
+  border-color: var(--navy); box-shadow: 0 0 0 3px rgba(10,49,97,0.1);
 }
 
 /* ── Submit button ────────────────────────────────────── */
-
 .submitBtn {
-  margin-top: 6px;
-  width: 100%;
-  padding: 14px 24px;
-  border-radius: 999px;
-  border: none; cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  font-weight: 700; font-size: 15px; letter-spacing: 0.01em;
+  margin-top: 4px; width: 100%; padding: 13px 24px; border-radius: 7px;
+  border: 1.5px solid var(--navy); cursor: pointer;
+  font-family: var(--font-arch); font-size: 11px; font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase;
   display: flex; align-items: center; justify-content: center; gap: 10px;
-  background: linear-gradient(135deg, #E8BC3A 0%, #D4A017 55%, #A67C10 100%);
-  color: #1a1408;
-  box-shadow: 0 8px 24px -8px rgba(212,160,23,0.55), inset 0 1px 0 rgba(255,255,255,0.35);
-  transition: transform .25s ease, box-shadow .25s ease;
+  background: var(--navy); color: #fff;
+  transition: background .2s, transform .2s;
 }
-
-.submitBtn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 34px -8px rgba(212,160,23,0.7), inset 0 1px 0 rgba(255,255,255,0.4);
-}
-
-.submitBtn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+.submitBtn:hover:not(:disabled) { background: #0d3d73; transform: translateY(-1px); }
+.submitBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Error ────────────────────────────────────────────── */
-
 .errorText {
-  color: var(--err);
-  font-size: 13px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: rgba(224, 87, 75, 0.1);
-  border: 1px solid rgba(224, 87, 75, 0.25);
-  margin: 0;
+  color: #dc2626; font-family: var(--font-body); font-size: 13px;
+  padding: 10px 14px; border-radius: 6px;
+  background: rgba(220,38,38,0.06); border: 1px solid rgba(220,38,38,0.2); margin: 0;
 }
 
 /* ── Spinner ──────────────────────────────────────────── */
-
 .spinner {
-  width: 16px; height: 16px; border-radius: 50%;
-  border: 2px solid rgba(26, 20, 8, 0.3);
-  border-top-color: #1a1408;
+  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
   animation: spin 0.7s linear infinite;
-  flex-shrink: 0;
 }
-
-@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Divider ──────────────────────────────────────────── */
-
 .divider {
   display: flex; align-items: center; gap: 12px;
-  color: var(--txtMuted); font-size: 12px; letter-spacing: 0.06em;
+  color: var(--ink-light); font-family: var(--font-arch); font-size: 10px; letter-spacing: 0.08em;
   margin: 4px 0;
 }
-
-.divider::before,
-.divider::after {
-  content: ""; flex: 1; height: 1px;
-  background: rgba(212, 160, 23, 0.12);
+.divider::before, .divider::after {
+  content: ""; flex: 1; height: 1px; background: var(--pencil-light);
 }
 
 /* ── Switch link ──────────────────────────────────────── */
-
 .authSwitch {
-  text-align: center;
-  margin-top: 22px;
-  font-size: 14px;
-  color: var(--txtDim);
+  text-align: center; margin-top: 20px;
+  font-family: var(--font-body); font-size: 13.5px; color: var(--ink-soft);
 }
-
-.authSwitch a {
-  color: var(--gold2);
-  text-decoration: none;
-  font-weight: 600;
-  transition: color .2s;
-}
-
-.authSwitch a:hover { color: var(--cream); }
+.authSwitch a { color: var(--navy); text-decoration: none; font-weight: 700; transition: color .15s; }
+.authSwitch a:hover { color: var(--saffron); }
 
 /* ── Back link ────────────────────────────────────────── */
-
 .backLink {
   display: inline-flex; align-items: center; gap: 6px;
-  color: var(--txtMuted); font-size: 13px;
-  position: absolute; top: 24px; left: 32px;
-  transition: color .2s;
+  font-family: var(--font-arch); font-size: 10px; letter-spacing: 0.1em;
+  color: var(--ink-light); position: absolute; top: 28px; left: 32px;
+  text-decoration: none; transition: color .15s;
 }
-
-.backLink:hover { color: var(--gold2); }
+.backLink:hover { color: var(--ink); }
